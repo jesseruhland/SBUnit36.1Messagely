@@ -1,3 +1,10 @@
+const express = require("express");
+const Message = require("../models/message");
+const { ensureLoggedIn } = require("../middleware/auth");
+const ExpressError = require("../expressError");
+
+const router = new express.Router();
+
 /** GET /:id - get detail of message.
  *
  * => {message: {id,
@@ -11,14 +18,20 @@
  *
  **/
 
-router.get("/:id", async function (req, res, next) {
+router.get("/:id", ensureLoggedIn, async function (req, res, next) {
   try {
     const { id } = req.params;
-    const result = await User.get(username);
-    if (!result) {
-      throw new ExpressError("User not found", 404);
+    const result = await Message.get(id);
+    if (
+      result.to_user.username != req.user.username &&
+      result.from_user.username != req.user.username
+    ) {
+      throw new ExpressError(
+        "You are not authorized to view that message!",
+        400
+      );
     }
-    return res.json({ user: result });
+    return res.json({ message: result });
   } catch (e) {
     return next(e);
   }
@@ -31,6 +44,17 @@ router.get("/:id", async function (req, res, next) {
  *
  **/
 
+router.post("/", ensureLoggedIn, async function (req, res, next) {
+  try {
+    const { to_username, body } = req.body;
+    const from_username = req.user.username;
+    const result = await Message.create({ from_username, to_username, body });
+    return res.json({ message: result });
+  } catch (e) {
+    return next(e);
+  }
+});
+
 /** POST/:id/read - mark message as read:
  *
  *  => {message: {id, read_at}}
@@ -38,3 +62,22 @@ router.get("/:id", async function (req, res, next) {
  * Make sure that the only the intended recipient can mark as read.
  *
  **/
+
+router.post("/:id/read", ensureLoggedIn, async function (req, res, next) {
+  try {
+    const { id } = req.params;
+    const message = await Message.get(id);
+    if (message.to_user.username != req.user.username) {
+      throw new ExpressError(
+        "You are not authorized to mark that message as read!",
+        400
+      );
+    }
+    const result = await Message.markRead(id);
+    return res.json({ message: result });
+  } catch (e) {
+    next(e);
+  }
+});
+
+module.exports = router;

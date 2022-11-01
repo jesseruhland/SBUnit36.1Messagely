@@ -18,10 +18,13 @@ router.post("/login", async function (req, res, next) {
     if (!username || !password) {
       throw new ExpressError("Please include 'username' and 'password'", 400);
     }
-    if (User.authenticate(username, password)) {
+    const result = await User.authenticate(username, password);
+    if (result) {
       const token = jwt.sign({ username }, SECRET_KEY);
       User.updateLoginTimestamp(username);
       return res.json({ token });
+    } else {
+      throw new ExpressError("Invalid username/password combination", 400);
     }
   } catch (e) {
     return next(e);

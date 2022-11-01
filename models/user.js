@@ -2,6 +2,7 @@
 const client = require("../db");
 const bcrypt = require("bcrypt");
 const { BCRYPT_WORK_FACTOR } = require("../config");
+const ExpressError = require("../expressError");
 
 /** User of the site. */
 
@@ -30,15 +31,12 @@ class User {
       `SELECT password FROM users WHERE username = $1`,
       [username]
     );
-    let user = result.rows[0];
-
-    if (user) {
-      if (await bcrypt.compare(password, user.password)) {
-        return true;
-      } else {
-        return false;
-      }
+    if (!result.rows[0]) {
+      throw new ExpressError("Invalid username/password combination", 400);
     }
+    let userPassword = result.rows[0].password;
+    const authorization = await bcrypt.compare(password, userPassword);
+    return authorization;
   }
 
   /** Update last_login_at for user */
@@ -75,7 +73,11 @@ class User {
       `SELECT username, first_name, last_name, phone, join_at, last_login_at FROM users WHERE username = $1`,
       [username]
     );
-    return result.rows[0];
+    const user = result.rows[0];
+    if (!user) {
+      throw new ExpressError("User not found", 404);
+    }
+    return user;
   }
 
   /** Return messages from this user.

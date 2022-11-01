@@ -1,8 +1,6 @@
 const express = require("express");
-const ExpressError = require("../expressError");
 const User = require("../models/user");
-const jwt = require("jsonwebtoken");
-const { SECRET_KEY } = require("../config");
+const { ensureLoggedIn, ensureCorrectUser } = require("../middleware/auth");
 
 const router = new express.Router();
 
@@ -12,7 +10,7 @@ const router = new express.Router();
  *
  **/
 
-router.get("/", async function (req, res, next) {
+router.get("/", ensureLoggedIn, async function (req, res, next) {
   try {
     const result = await User.all();
     return res.json({ users: result });
@@ -27,13 +25,10 @@ router.get("/", async function (req, res, next) {
  *
  **/
 
-router.get("/:username", async function (req, res, next) {
+router.get("/:username", ensureCorrectUser, async function (req, res, next) {
   try {
     const { username } = req.params;
     const result = await User.get(username);
-    if (!result) {
-      throw new ExpressError("User not found", 404);
-    }
     return res.json({ user: result });
   } catch (e) {
     return next(e);
@@ -50,13 +45,10 @@ router.get("/:username", async function (req, res, next) {
  *
  **/
 
-router.get("/:username/to", async function (req, res, next) {
+router.get("/:username/to", ensureCorrectUser, async function (req, res, next) {
   try {
     const { username } = req.params;
     const user = await User.get(username);
-    if (!user) {
-      throw new ExpressError("User not found", 404);
-    }
     const result = await User.messagesTo(username);
     return res.json({ messages: result });
   } catch (e) {
@@ -74,18 +66,19 @@ router.get("/:username/to", async function (req, res, next) {
  *
  **/
 
-router.get("/:username/from", async function (req, res, next) {
-  try {
-    const { username } = req.params;
-    const user = await User.get(username);
-    if (!user) {
-      throw new ExpressError("User not found", 404);
+router.get(
+  "/:username/from",
+  ensureCorrectUser,
+  async function (req, res, next) {
+    try {
+      const { username } = req.params;
+      const user = await User.get(username);
+      const result = await User.messagesFrom(username);
+      return res.json({ messages: result });
+    } catch (e) {
+      return next(e);
     }
-    const result = await User.messagesFrom(username);
-    return res.json({ messages: result });
-  } catch (e) {
-    return next(e);
   }
-});
+);
 
 module.exports = router;
